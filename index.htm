@@ -98,7 +98,7 @@
             // REQUESTING DATA
             const requestData = async function() {
 
-                const nbhds = await d3.json("./SFN-Edited.json");
+                const nbhds = await d3.json("./static/SFN-Edited.json");
 
                 // ----- VISUALIZING DATA -----
                 
@@ -189,7 +189,7 @@
 
                 /////////////////////////////////////////////
 
-                d3.json("./SFN-TreeMapContent.json").then( data => {
+                d3.json("./static/SFN-TreeMapContent.json").then( data => {
                     data.children = data.children.sort( (a, b) => {
                         return b.total - a.total;
                     }).slice(0, 15);
