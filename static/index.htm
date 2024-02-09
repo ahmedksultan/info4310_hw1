@@ -1,124 +1,521 @@
-<html><head>
-<title>INFO 3300 - March 9</title>
+<html>
+    <head>
+        <title>INFO 4310 - HW1</title>
 
-  <link href="https://fonts.googleapis.com/css?family=Lato:400,700|Raleway:400,700" rel="stylesheet">
+        <script src="https://d3js.org/d3.v5.min.js"></script>
+        <script src="https://d3js.org/topojson.v2.min.js"></script>
+        <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
 
-  <link rel="stylesheet" type="text/css" href="../css/normalize.css">
-  <link rel="stylesheet" type="text/css" href="../css/skeleton.css">
-  <link rel="stylesheet" type="text/css" href="../css/custom-style.css">
+        <style>
+            .header {
+                text-align: center;
+                font-family: "Helvetica";
+            }
+            
+            .page-title {
+                font-size: 72px;
+                padding-top: 0.5em;
+                margin: 0;
+            }
 
-  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.14.2/styles/default.min.css">
-  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.14.2/highlight.min.js"></script>
-  <script src="https://d3js.org/d3.v5.min.js"></script>
-  <script src="https://d3js.org/topojson.v2.min.js"></script>
-  <style>
+            .neighborhood {
+                stroke: #efefef;
+                stroke-width: 2px;
+            }
 
-  .neighborhood {
-    fill: #EEE;
-    stroke: white;
-    stroke-width: 2px;
-  }
+            svg {
+                padding-left: 5vw;
+            }
 
-  </style>
+            .container {
+                display: flex;
+                flex-direction: row;
+            }
 
-</head>
-<body>
-  <div class="container larger">
-    <p> A map of SF trees:</p>
-  <svg id="points" height="900" width="900" style="background: #fff; margin-top:50px" >
+            h2 {
+                font-family: "Helvetica";
+                text-align: center;
+            }
+        </style>
+    </head>
 
-  </svg>
+    <body>
+        <div class="header">
+            <h1 class="page-title">SF Treemaps</h1>
+            <p>prepared by Ahmed Sultan (aks264), for Professor Rzeszotarski's INFO 4310 class</p>
+        </div>
+
+        <div class="container">
+            <div>
+                <h2>
+                    Tree density by SF neighborhood
+                </h2>
+                <svg id="choropleth" height="600" width="600"></svg>
+                <svg id="legend1" height="100" width="600"></svg>
+            </div>
+            <div>
+                <h2>
+                    Popular trees in 15 most tree-populated neighborhoods
+                </h2>
+                <svg id="treemap" height="600" width="600"></svg>
+                <svg id="legend2" height="100" width="600"></svg>
+            </div>
+            
+        </div>
+
+        <script>
+
+            
+
+            // SETTING UP CHOROPLETH SVG
+            const svg = d3.select("#choropleth");
+            const width = svg.attr("width");
+            const height = svg.attr("height");
+
+            const margin = {
+                top: 10, bottom: 10, right: 10, left: 10
+            };
+
+            const mapWidth = width - margin.left - margin.right;
+            const mapHeight = height - margin.top -margin.bottom;
+
+            const map = svg.append("g")
+                .attr("transform", "translate("+margin.left+","+margin.top+")");
+
+            ///////////////////////////////////////////
+
+            // SETTING UP TREEMAP SVG
+            const svg2 = d3.select("#treemap");
+            const width2 = svg2.attr("width");
+            const height2 = svg2.attr("height");
+
+            const chartWidth = width2 - margin.left - margin.right;
+            const chartHeight = height2 -margin.left - margin.right;
+
+            const chart = svg2.append("g")
+                .attr("transform", "translate("+margin.left+","+margin.top+")");
+
+            // REQUESTING DATA
+            const requestData = async function() {
+
+                const nbhds = await d3.json("./SFN-Edited.json");
+
+                // ----- VISUALIZING DATA -----
+                
+                // geojson stuff
+                let projection = d3.geoMercator().fitSize([mapWidth, mapHeight], nbhds);
+                let path = d3.geoPath().projection(projection);
+
+                // finding color scale
+                // calculate density per neighborhood
+                let densities = [];
+
+                nbhds.features.forEach( n => {
+                    densities.push(n.properties['density']);
+
+                    // console.log(n.properties.name, n.properties.density);
+                });
+
+                // find extent & extrapolate scale
+                const minmax = d3.extent(Object.values(densities));
+                // console.log("minmax", minmax);
+
+                let colorScale = d3.scaleQuantize()
+                    .domain(minmax)
+                    .range(d3.schemeGreens[5]);
+                
+                // drawing neighborhoods
+                map.selectAll("path.neighborhood").data(nbhds.features)
+                    .join("path")
+                    .attr("class", "neighborhood")
+                    .attr("fill", d => colorScale( d.properties.density ))
+                    .attr("d", path);
+
+                // LEGENDS
+                const legend1 = d3.select("#legend1");
+                const lwidth1 = legend1.attr("width");
+                const lheight1 = legend1.attr("height");
+
+                legend1.append('rect')
+                    .attr('x', 0)
+                    .attr('y', 20)
+                    .attr('width', 120)
+                    .attr('height', 20)
+                    .attr('fill', colorScale( 1 ));
+
+                legend1.append('text')
+                    .attr('x', 10)
+                    .attr('y', 33)
+                    .style('font-size', 8)
+                    .style('font-family', 'sans-serif')
+                    .text("Less dense");
+
+                legend1.append('rect')
+                    .attr('x', 120)
+                    .attr('y', 20)
+                    .attr('width', 120)
+                    .attr('height', 20)
+                    .attr('fill', colorScale( 100 ));
+
+                legend1.append('rect')
+                    .attr('x', 240)
+                    .attr('y', 20)
+                    .attr('width', 120)
+                    .attr('height', 20)
+                    .attr('fill', colorScale( 200 ));
+
+                legend1.append('rect')
+                    .attr('x', 360)
+                    .attr('y', 20)
+                    .attr('width', 120)
+                    .attr('height', 20)
+                    .attr('fill', colorScale( 300 ));
+
+                legend1.append('rect')
+                    .attr('x', 480)
+                    .attr('y', 20)
+                    .attr('width', 120)
+                    .attr('height', 20)
+                    .attr('fill', colorScale( 400 ));
+
+                legend1.append('text')
+                    .attr('x', 550)
+                    .attr('y', 33)
+                    .style('font-size', 8)
+                    .style('font-family', 'sans-serif')
+                    .attr('fill', "white")
+                    .text("More dense");
+                
+
+                /////////////////////////////////////////////
+
+                d3.json("./SFN-TreeMapContent.json").then( data => {
+                    data.children = data.children.sort( (a, b) => {
+                        return b.total - a.total;
+                    }).slice(0, 15);
+
+                    const root = d3.hierarchy(data).sum( (d) => Math.pow(d['total'], 2) );
+
+                    root.sort( ((a, b) => d3.descending(a.value, b.value)) );
+
+                    d3.treemap()
+                        .tile(d3.treemapBinary)
+                        .size([chartWidth, chartHeight])
+                        .padding(2)
+                        (root)
+                    
+                    const treemapColorScale = d3.scaleOrdinal()
+                        .domain(["Sycamore: London Plane", "Brisbane Box", "Cherry Plum", "Southern Magnolia", "New Zealand Xmas Tree", "Victorian Box", "Swamp Myrtle", "Juniper", "Indian Laurel Fig Tree 'Green Gem'", "Hybrid Strawberry Tree"])
+                        .range(["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"])
+                        .unknown("grey");                
+
+                    // --- DATA VISUALIZATION --- 
+                    svg2
+                        .selectAll('rect')
+                        .data(root.leaves())
+                        .join('rect')
+                            .attr('x', (d) => d.x0 )
+                            .attr('y', (d) => d.y0 )
+                            .attr('width', (d) => d.x1 - d.x0 )
+                            .attr('height', (d) => d.y1 - d.y0 )
+                            .style('fill', (d) => treemapColorScale( d.data.top_tree ) )
+                    
+                    svg2.selectAll('text#nbhd')
+                        .data(root.leaves())
+                        .join('text')
+                            .attr('class', 'nbhd')
+                            .text( (d) => d.data.neighborhood )
+                            .attr('font-weight', 'bold')
+                            .attr('font-size', 8)
+                            .attr('font-family', 'sans-serif')
+                            .attr('fill', '#fff')
+                            .attr('x', (d) => d.x0 + 5 )
+                            .attr('y', (d) => d.y0 + 15 )  
+
+                    svg2.selectAll('text#value')
+                        .data(root.leaves())
+                        .join('text')
+                            .attr('class', 'value')
+                            .text( (d) => d.data.total )
+                            .attr('font-size', 8)
+                            .attr('font-family', 'sans-serif')
+                            .attr('fill', '#fff')
+                            .attr('x', (d) => d.x0 + 5 )
+                            .attr('y', (d) => d.y0 + 25 )  
+
+                    const legend2 = d3.select("#legend2");
+                    const lwidth2 = legend1.attr("width");
+                    const lheight2 = legend1.attr("height");
+
+                    legend2.append('rect')
+                        .attr('x', 0)
+                        .attr('y', 20)
+                        .attr('width', 20)
+                        .attr('height', 20)
+                        .attr('fill', treemapColorScale("Sycamore: London Plane"));
+
+                    legend2.append('text')
+                        .attr('x', 25)
+                        .attr('y', 30)
+                        .style('font-size', 8)
+                        .style('font-family', 'sans-serif')
+                        .text("Sycamore: London Plane");
+
+                    legend2.append('rect')
+                        .attr('x', 130)
+                        .attr('y', 20)
+                        .attr('width', 20)
+                        .attr('height', 20)
+                        .attr('fill', treemapColorScale("Brisbane Box"));
+
+                    legend2.append('text')
+                        .attr('x', 155)
+                        .attr('y', 30)
+                        .style('font-size', 8)
+                        .style('font-family', 'sans-serif')
+                        .text("Brisbane Box");
+
+                    legend2.append('rect')
+                        .attr('x', 215)
+                        .attr('y', 20)
+                        .attr('width', 20)
+                        .attr('height', 20)
+                        .attr('fill', treemapColorScale("Cherry Plum"));
+
+                    legend2.append('text')
+                        .attr('x', 240)
+                        .attr('y', 30)
+                        .style('font-size', 8)
+                        .style('font-family', 'sans-serif')
+                        .text("Cherry Plum");
+
+                    legend2.append('rect')
+                        .attr('x', 300)
+                        .attr('y', 20)
+                        .attr('width', 20)
+                        .attr('height', 20)
+                        .attr('fill', treemapColorScale("Southern Magnolia"));
+
+                    legend2.append('text')
+                        .attr('x', 325)
+                        .attr('y', 30)
+                        .style('font-size', 8)
+                        .style('font-family', 'sans-serif')
+                        .text("Southern Magnolia");
+
+                    legend2.append('rect')
+                        .attr('x', 400)
+                        .attr('y', 20)
+                        .attr('width', 20)
+                        .attr('height', 20)
+                        .attr('fill', treemapColorScale("New Zealand Xmas Tree"));
+
+                    legend2.append('text')
+                        .attr('x', 425)
+                        .attr('y', 30)
+                        .style('font-size', 8)
+                        .style('font-family', 'sans-serif')
+                        .text("New Zealand Xmas Tree");
+
+                    legend2.append('rect')
+                        .attr('x', 0)
+                        .attr('y', 50)
+                        .attr('width', 20)
+                        .attr('height', 20)
+                        .attr('fill', treemapColorScale("Victorian Box"));
+
+                    legend2.append('text')
+                        .attr('x', 25)
+                        .attr('y', 60)
+                        .style('font-size', 8)
+                        .style('font-family', 'sans-serif')
+                        .text("Victorian Box");
+
+                    legend2.append('rect')
+                        .attr('x', 85)
+                        .attr('y', 50)
+                        .attr('width', 20)
+                        .attr('height', 20)
+                        .attr('fill', treemapColorScale("Swamp Myrtle"));
+
+                    legend2.append('text')
+                        .attr('x', 110)
+                        .attr('y', 60)
+                        .style('font-size', 8)
+                        .style('font-family', 'sans-serif')
+                        .text("Swamp Myrtle");
+                        
+                    legend2.append('rect')
+                        .attr('x', 170)
+                        .attr('y', 50)
+                        .attr('width', 20)
+                        .attr('height', 20)
+                        .attr('fill', treemapColorScale("Juniper"));
+
+                    legend2.append('text')
+                        .attr('x', 195)
+                        .attr('y', 60)
+                        .style('font-size', 8)
+                        .style('font-family', 'sans-serif')
+                        .text("Juniper");
+
+                    legend2.append('rect')
+                        .attr('x', 230)
+                        .attr('y', 50)
+                        .attr('width', 20)
+                        .attr('height', 20)
+                        .attr('fill', treemapColorScale("Indian Laurel Fig Tree 'Green Gem'"));
+
+                    legend2.append('text')
+                        .attr('x', 255)
+                        .attr('y', 60)
+                        .style('font-size', 8)
+                        .style('font-family', 'sans-serif')
+                        .text("Indian Laurel Fig Tree 'Green Gem'");
+
+                    legend2.append('rect')
+                        .attr('x', 390)
+                        .attr('y', 50)
+                        .attr('width', 20)
+                        .attr('height', 20)
+                        .attr('fill', treemapColorScale("Hybrid Strawberry Tree"));
+
+                    legend2.append('text')
+                        .attr('x', 415)
+                        .attr('y', 60)
+                        .style('font-size', 8)
+                        .style('font-family', 'sans-serif')
+                        .text("Hybrid Strawberry Tree");
+                })
+                
+                
+            // "Swamp Myrtle", "Juniper", "Indian Laurel Fig Tree 'Green Gem'", "Hybrid Strawberry Tree"])
+
+                
+
+                /* 
+
+                // PARSE THRU DATA
+                console.log(nbhds);
+
+                let neighborhood_Counts = []
+
+                nbhds.features.forEach( n => {
+                    let treesSelect = n.properties.trees;
+                    let treeTotal = treesSelect.total;
+                    let treeTopKey = "";
+                    let treeTopValue = 0;
+                    let treeDensity = n.properties.density;
+
+                    delete(treesSelect.total);
+
+                    for (let key in treesSelect) {
+                        if(treesSelect[key] > treeTopValue) {
+                            treeTopKey = key;
+                            treeTopValue = treesSelect[key];
+                        }
+                    }
+
+                    item = {
+                        "neighborhood": n.properties.name,
+                        "total": treeTotal,
+                        "top_tree": treeTopKey,
+                        "top_tree_value": treeTopValue,
+                        "density": treeDensity
+                    }
+
+                    neighborhood_Counts.push(item);
+                });
+
+                */
+
+                // exporting to JSON for tree map
+                // console.log(JSON.stringify({"children": neighborhood_Counts}));
 
 
+                /*
 
-  <script id="notes1">
+                // ----- NEIGHBORHOODS -----
+                
+                const sf_nbhd_data = await d3.json("./SF-Neighborhoods.geo.json");
+                let nbhds = topojson.feature(sf_nbhd_data, sf_nbhd_data.objects.SFNeighborhoods);
+                
+                // adding blank dictionaries to store neighborhood tree data
+                nbhds.features.forEach( n => {
+                    n.properties['area'] = d3.geoArea(n) * 100000000; 
+                    n.properties['trees'] = {}
+                });
+                
+                console.log("NEIGHBORHOODS", nbhds);
+                
+                
+                // ----- TREES -----
 
-  const svg = d3.select("#points");
-  const width = svg.attr("width");
-  const height = svg.attr("height");
-  const margin = { top: 20, right: 20, bottom: 20, left:20};
-  const mapWidth = width - margin.left - margin.right;
-  const mapHeight = height - margin.top - margin.bottom;
-  const map = svg.append("g")
-                  .attr("transform","translate("+margin.left+","+margin.top+")");
+                const tree_data = await d3.csv("./Street_Tree_List-2022-01-30_FILTERED.csv");
+                console.log("TREES (FILTERED)", tree_data);
 
-  // Let's make a map of all of the municipal trees in San Francisco
-  // With any luck, we ought to be able to visualize the streets/blocks in the city, since trees line them
-  //   (this is really just an excuse to make a lot of dots)
-  
-  // Datasets for today:
-  //  "../datasets/SF-Neighborhoods.json"
-  //  "../datasets/Street_Tree_List_smaller.csv"
+                // counting number of trees, types of trees in each neighborhood
+                tree_data.forEach( t => {
+                    let t_species = t.qSpecies.split("::")[1].trim();
+                    if (t_species == "") {
+                        t_species = t.qSpecies.split("::")[0].trim();
+                    }
 
+                    let t_coords = [t.Longitude, t.Latitude];
+                    neighborhoodChecker(t_coords, t_species);
+                });
 
-  // 1. Make the visualization
-  //  (refer to 03/04 notes for more comments)
-  const requestData = async function() {
-    
-    const sf = await d3.json("./SF-Neighborhoods.json");
-    console.log(sf);
-    
-    // We find that the feature we want to visualize is the SFNeighborhoods property within objects
-    //  Always search .objects for different features to show in a topoJSON dataset
-    var neighborhoods = topojson.feature(sf, sf.objects.SFNeighborhoods);
-    
-    // We use Mercator projection instead of a "better" projection because it's more familiar
-    // It also leads to a flat line on the bottom of the city due to how the projection makes all
-    //  latitude lines flat (which allows rhumb line equivalency)
-    var projection = d3.geoMercator().fitSize([mapWidth, mapHeight], neighborhoods);
-    var path = d3.geoPath().projection(projection);
-    
-    // Draw neighborhoods
-    // Just as in our line generators, the scale is used by the generator to take complex data and
-    //  generate fancy paths
-    map.selectAll("path.neighborhood").data(neighborhoods.features)
-      .join("path")
-      .attr("class", "neighborhood")
-      .attr("d", path);
-      
-      
-    const trees = await d3.csv("./Street_Tree_List_smaller.csv");
-    
-    
-    // We need to figure out where to position the dots. Since we may have a lot of them, let's process
-    //  the data ahead of time and add to our dict
-    // (Main reason for doing this is that otherwise we would have to call projection() twice, once
-    //    for 'cx' and once for 'cy')
-    trees.forEach( d => {
-      
-      // Use the projection just like a scale to convert from lng/lat to pixels
-      d.Position = projection( [d.Longitude, d.Latitude] );
-      
-    });
-    
-    // Draw circles using the Positions we just made
-    map.selectAll("circle").data(trees)
-       .join("circle")
-       .attr("r", 1)
-       .attr("fill", "forestgreen")
-       .attr("opacity", 0.4)
-       .attr("cx", d => d.Position[0])
-       .attr("cy", d => d.Position[1]);
-    
-    
-    
-  }
-  requestData();
-  
-  
-  
+                // helper function
+                function neighborhoodChecker(coords, species) {
+                    nbhds.features.forEach ( n => {
+                        if (d3.geoContains(n, [coords[0], coords[1]])) {
+                            if (!n.properties['trees']['total']) {
+                                n.properties['trees']['total'] = 1;
+                            } else {
+                                n.properties['trees']['total'] += 1;
+                            }
 
+                            if (!n.properties['trees'][species]) {
+                                n.properties['trees'][species] = 1;
+                            } else {
+                                n.properties['trees'][species] += 1;
+                            }
 
+                            return n.properties.name;
+                        }
+                    })
+                }
 
+                console.log("NEIGHBORHOODS", nbhds);
 
-  </script>
+                
 
+                
+                
+                nbhds.features.forEach( n => {
+                    let p_trees = n.properties['trees']['total'];
+                    let p_area = n.properties['area'];
 
+                    let p_density = p_trees / p_area;
+                    n.properties['density'] = p_density;
+                    densities.push(p_density);
 
+                    console.log(n.properties.name, p_density);
+                });
 
+                // find extent & extrapolate scale
+                const minmax = d3.extent(Object.values(densities));
+                console.log("minmax", minmax);
 
-  
+                console.log(JSON.stringify(nbhds));
 
-  </div>
-</body>
+                */
+
+                
+            }
+
+            requestData();
+
+        </script>
+    </body>
 </html>
